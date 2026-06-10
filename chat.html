@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+    <title>Chat Comunitario | SocketDevz VPN</title>
+    <style>
+        .chat-page { max-width: 900px; margin: 28px auto; padding: 0 16px; }
+        .chat-box { background: var(--bg-soft); border:1px solid var(--line); padding:18px; border-radius:12px }
+        #chatMessages{max-height:60vh;overflow:auto;padding:12px;border:1px solid var(--line);background:var(--bg);border-radius:8px;margin-bottom:12px}
+        #chatArea .emoji-btn{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:transparent;cursor:pointer}
+        #chatArea .emoji-btn:hover{background:rgba(255,255,255,0.03)}
+        .chat-message{padding:8px;border-radius:8px;margin-bottom:8px;background:var(--bg-soft);border:1px solid var(--line)}
+        .chat-meta{font-size:0.8rem;color:var(--muted);margin-bottom:6px}
+        .chat-text{font-size:0.95rem;color:var(--text);word-break:break-word}
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="topnav" aria-label="Navegación principal">
+            <div class="brand">
+                <img src="https://play-lh.googleusercontent.com/HgV73Gt79AcwJg-j3EZUh3i4ntJRqzrn6laR-VOCdUyyvCtZa-b-gWoMpZCBPGGfjjlmGzwluLI55h9o-TZRcw=w240-h480" alt="Logo" class="logo">
+                <h1>SocketDevz VPN</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="vps.html">Gestión VPS</a></li>
+                <li><a href="chat.html">Chat</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="chat-page">
+        <div class="chat-box">
+            <h2><i class="bi bi-chat-dots"></i> Chat Comunitario</h2>
+            <p style="color:var(--muted);">El chat se limpia automáticamente a las 00:00 (hora Colombia).</p>
+
+            <div id="chatArea">
+                <div id="chatMessages"></div>
+
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                    <input id="chatName" type="text" placeholder="Tu nombre (ej: anon123)" style="flex:0.3;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)">
+                    <input id="chatInput" type="text" placeholder="Escribe un mensaje..." style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)">
+                    <button id="sendChatBtn" class="btn btn-submit" style="flex:0">Enviar</button>
+                </div>
+
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="emoji-btn">😀</button>
+                    <button class="emoji-btn">😂</button>
+                    <button class="emoji-btn">👍</button>
+                    <button class="emoji-btn">🔥</button>
+                    <button class="emoji-btn">🎉</button>
+                    <button class="emoji-btn">😮</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© <span id="year"></span> SocketDevz VPN · KYZ</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        // Chat script (same logic as vps.html chat)
+        const CHAT_KEY = 'communityChat';
+        const CHAT_CLEANUP_KEY = 'communityChatLastCleanup';
+        const BC_NAME = 'socketdevz_chat_channel';
+        let bc = null;
+
+        function nowColombia() {
+            const d = new Date();
+            const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+            return new Date(utc - (5 * 60 * 60000));
+        }
+
+        function chatCleanupIfNeeded() {
+            const dt = nowColombia();
+            const dateStr = dt.toISOString().slice(0,10);
+            const last = localStorage.getItem(CHAT_CLEANUP_KEY);
+            if (last !== dateStr && dt.getHours() === 0) {
+                localStorage.removeItem(CHAT_KEY);
+                localStorage.setItem(CHAT_CLEANUP_KEY, dateStr);
+                broadcastChatUpdate();
+            }
+        }
+
+        function loadChatMessages() { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch(e) { return []; } }
+        function saveChatMessages(list) { localStorage.setItem(CHAT_KEY, JSON.stringify(list)); }
+
+        function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        function renderChat() {
+            const container = document.getElementById('chatMessages');
+            if (!container) return;
+            const msgs = loadChatMessages();
+            container.innerHTML = msgs.map(m => `
+                <div class="chat-message">
+                    <div class="chat-meta"><strong>${escapeHtml(m.name)}</strong> · <span style="color:var(--muted)">${new Date(m.ts).toLocaleString()}</span></div>
+                    <div class="chat-text">${escapeHtml(m.text)}</div>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function broadcastChatUpdate() { if (bc) bc.postMessage({type:'chat-update'}); localStorage.setItem('chat_ping', Date.now().toString()); }
+
+        function initChatPage() {
+            try { bc = new BroadcastChannel(BC_NAME); bc.onmessage = ev => { if (ev.data && ev.data.type==='chat-update') renderChat(); }; } catch(e){ bc=null; }
+            window.addEventListener('storage', (e) => { if (e.key === CHAT_KEY || e.key === 'chat_ping') renderChat(); });
+
+            const sendBtn = document.getElementById('sendChatBtn');
+            const chatInput = document.getElementById('chatInput');
+            const chatName = document.getElementById('chatName');
+            const emojis = document.querySelectorAll('#chatArea .emoji-btn');
+
+            sendBtn.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') sendChatMessage(); });
+            emojis.forEach(btn => btn.addEventListener('click', ()=>{ chatInput.value += btn.textContent; chatInput.focus(); }));
+
+            renderChat(); chatCleanupIfNeeded(); setInterval(chatCleanupIfNeeded, 60*1000);
+        }
+
+        function sendChatMessage() {
+            const nameEl = document.getElementById('chatName');
+            const inputEl = document.getElementById('chatInput');
+            const name = (nameEl.value || 'Anon').trim().slice(0,30);
+            const text = (inputEl.value || '').trim().slice(0,500);
+            if (!text) return;
+            const msgs = loadChatMessages();
+            msgs.push({id: Date.now()+Math.random(), name: name, text: text, ts: Date.now()});
+            saveChatMessages(msgs);
+            inputEl.value = '';
+            renderChat(); broadcastChatUpdate();
+        }
+
+        window.addEventListener('load', () => { initChatPage(); });
+    </script>
+</body>
+</html>

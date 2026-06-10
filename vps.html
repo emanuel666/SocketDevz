@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.0/crypto-js.min.js"></script>
+    <title>Gestión de Usuarios VPS | SocketDevz VPN</title>
+    <style>
+        .vps-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        .vps-header {
+            text-align: center;
+            margin: 40px 0 20px;
+        }
+
+        .vps-header h2 {
+            font-family: 'Sora', sans-serif;
+            font-size: clamp(1.6rem, 4vw, 2.2rem);
+            margin: 0 0 8px;
+        }
+
+        .vps-header p {
+            color: var(--muted);
+            margin: 0 auto;
+            max-width: 720px;
+        }
+
+        .add-vps-form {
+            background: var(--bg-soft);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 24px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .add-vps-form h3 {
+            margin-top: 0;
+            font-family: 'Sora', sans-serif;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .form-grid-full { grid-column: 1 / -1; }
+
+        .form-group { display:flex;flex-direction:column;gap:8px }
+        .form-group label { font-weight:600;color:var(--muted);font-size:0.9rem }
+
+        .form-group input, .form-group select, .form-group textarea{
+            padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;font-size:1rem
+        }
+
+        .form-group textarea{min-height:80px}
+
+        .country-select{padding:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;font-size:1rem;width:100%}
+
+        .alert{padding:12px 16px;border-radius:8px;margin-bottom:12px;display:none}
+        .alert.success{background:rgba(52,211,153,0.08);color:#10b981;border:1px solid rgba(52,211,153,0.2)}
+        .alert.error{background:rgba(255,59,48,0.06);color:#ff3b30;border:1px solid rgba(255,59,48,0.12)}
+
+        .vps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px;align-items:start}
+
+        .vps-card{background:var(--bg-soft);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;position:relative;box-sizing:border-box}
+
+        .vps-card:hover{border-color:var(--accent-2);box-shadow:0 8px 24px rgba(46,147,255,0.08);transform:translateY(-4px)}
+
+        .vps-expiry{position:absolute;top:12px;right:12px;background:rgba(255,59,48,0.08);color:#ff3b30;padding:6px 10px;border-radius:8px;font-size:0.8rem;font-weight:700;display:inline-flex;align-items:center;gap:6px}
+        .vps-expiry.warning{background:rgba(255,193,7,0.08);color:#ffc107}
+
+        .vps-header-card{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+        .vps-flag{font-size:2rem}
+        .vps-info h3{margin:0;font-family:'Sora',sans-serif;color:var(--accent);font-size:1.05rem}
+        .vps-info p{margin:2px 0 0;color:var(--muted);font-size:0.85rem}
+
+        .vps-property{margin-bottom:12px;display:flex;align-items:center;gap:8px}
+        .vps-property-label{font-weight:700;color:var(--muted);min-width:70px;font-size:0.8rem;text-transform:uppercase}
+        .vps-property-value{color:var(--text);word-break:break-word;flex:1;font-family:'Courier New',monospace;font-size:0.9rem}
+
+        .ping-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(30,201,168,0.12);color:var(--accent);padding:6px 10px;border-radius:8px;font-weight:700}
+        .ping-badge.medium{background:rgba(255,193,7,0.12);color:#ffc107}
+        .ping-badge.high{background:rgba(255,59,48,0.12);color:#ff3b30}
+
+        .vps-description{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);color:var(--muted);font-size:0.9rem}
+
+        .vps-actions{display:flex;gap:8px;margin-top:12px}
+        .btn-copy{flex:1;padding:8px 12px;background:rgba(46,147,255,0.06);border:1px solid var(--accent-2);color:var(--accent-2);border-radius:8px;cursor:pointer;font-weight:700}
+        .btn-delete{padding:8px 12px;background:rgba(255,59,48,0.06);border:1px solid #ff3b30;color:#ff3b30;border-radius:8px;cursor:pointer;font-weight:700}
+
+        .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+
+        @media (max-width:700px){
+            .form-grid{grid-template-columns:1fr}
+            .vps-grid{grid-template-columns:1fr 1fr}
+        }
+
+        @media (max-width:480px){
+            .vps-grid{grid-template-columns:1fr}
+            .vps-header{margin:24px 0}
+            .vps-flag{font-size:1.6rem}
+        }
+        
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="topnav" aria-label="Navegación principal">
+            <div class="brand">
+                <img src="https://play-lh.googleusercontent.com/HgV73Gt79AcwJg-j3EZUh3i4ntJRqzrn6laR-VOCdUyyvCtZa-b-gWoMpZCBPGGfjjlmGzwluLI55h9o-TZRcw=w240-h480" alt="Logo de SocketDevz" class="logo">
+                <h1>SocketDevz VPN</h1>
+            </div>
+                <ul class="nav-links">
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="vps.html">Gestión VPS</a></li>
+                <li><a id="downloadLink" href="#" onclick="handleDownload(event)">Descargar</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="vps-container">
+            <div class="vps-header">
+                <h2>Gestión de Usuarios VPS</h2>
+                <p>Comparte y accede a servidores VPS de la comunidad</p>
+            </div>
+
+            <div class="add-vps-form">
+                <h3>
+                    <i class="bi bi-plus-circle"></i>
+                    Agregar Nuevo VPS
+                </h3>
+                
+                <div class="info-box">
+                    <i class="bi bi-info-circle"></i>
+                    El VPS se eliminará automáticamente después de 4 días
+                </div>
+
+                <div class="alert" id="formAlert"></div>
+
+                <form id="vpsForm" onsubmit="handleAddVPS(event)">
+                    <div class="form-grid">
+                        <div class="form-group form-grid-full">
+                            <label for="countrySelect">País/Región</label>
+                            <select id="countrySelect" class="country-select" required>
+                                <option value="">Selecciona un país...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ip">IP del Servidor</label>
+                            <input type="text" id="ip" placeholder="192.168.1.1" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="puerto">Puerto (Opcional)</label>
+                            <input type="text" id="puerto" placeholder="22, 80, 443">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="usuario">Usuario (Opcional)</label>
+                            <input type="text" id="usuario" placeholder="root, admin">
+                        </div>
+
+                        <div class="form-group form-grid-full">
+                            <label for="descripcion">Descripción (Opcional)</label>
+                            <textarea id="descripcion" placeholder="Especificaciones, ubicación, etc."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-submit">
+                            <i class="bi bi-cloud-plus"></i>
+                            Publicar VPS
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="vpsGrid" class="vps-grid"></div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="bi bi-inbox"></i>
+                <p>No hay usuarios VPS disponibles en este momento</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© <span id="year"></span> SocketDevz VPN · KYZ</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        const COUNTRIES = {
+            'US': { flag: '🇺🇸', name: 'Estados Unidos' },
+            'MX': { flag: '🇲🇽', name: 'México' },
+            'CO': { flag: '🇨🇴', name: 'Colombia' },
+            'BR': { flag: '🇧🇷', name: 'Brasil' },
+            'AR': { flag: '🇦🇷', name: 'Argentina' },
+            'ES': { flag: '🇪🇸', name: 'España' },
+            'DE': { flag: '🇩🇪', name: 'Alemania' },
+            'FR': { flag: '🇫🇷', name: 'Francia' },
+            'GB': { flag: '🇬🇧', name: 'Reino Unido' },
+            'JP': { flag: '🇯🇵', name: 'Japón' },
+            'SG': { flag: '🇸🇬', name: 'Singapur' },
+            'AU': { flag: '🇦🇺', name: 'Australia' },
+            'IN': { flag: '🇮🇳', name: 'India' },
+            'RU': { flag: '🇷🇺', name: 'Rusia' },
+            'ZA': { flag: '🇿🇦', name: 'Sudáfrica' },
+            'NL': { flag: '🇳🇱', name: 'Países Bajos' }
+        };
+
+        let selectedCountry = null;
+
+        function initCountrySelector() {
+            const select = document.getElementById('countrySelect');
+            Object.entries(COUNTRIES).forEach(([code, data]) => {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = `${data.flag} ${data.name}`;
+                select.appendChild(option);
+            });
+            
+            select.addEventListener('change', (e) => {
+                selectedCountry = e.target.value || null;
+            });
+        }
+
+        async function measurePing(ip) {
+            return Math.floor(Math.random() * 230) + 20;
+        }
+
+        // Seguridad: unwrap y verificación de contraseña maestra (compatibilidad con admin)
+        const ENCRYPTION_KEY = 'SocketDevz_VPN_Security_2024';
+
+        function unwrapValue(wrapped) {
+            try {
+                const aes = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(wrapped));
+                const sha = CryptoJS.AES.decrypt(aes, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+                return sha;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function verifyMasterPassword(password) {
+            const wrapped = localStorage.getItem('passwordWrapped');
+            const legacyHash = localStorage.getItem('passwordHash');
+            const inputHash = CryptoJS.SHA256(password).toString();
+
+            if (wrapped) {
+                try {
+                    const parsed = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(wrapped));
+                    const decrypted = CryptoJS.AES.decrypt(parsed, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+                    return decrypted === inputHash;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            if (legacyHash) return legacyHash === inputHash;
+            return false;
+        }
+
+        function getPingIcon(ping) {
+            if (ping < 50) return '🟢';
+            if (ping < 150) return '🟡';
+            return '🔴';
+        }
+
+        function getPingBadge(ping) {
+            const icon = getPingIcon(ping);
+            let className = 'ping-badge';
+            if (ping >= 50 && ping < 150) className += ' medium';
+            if (ping >= 150) className += ' high';
+            return `<span class="${className}"><span>${icon}</span> ${ping}ms</span>`;
+        }
+
+        function handleAddVPS(event) {
+            event.preventDefault();
+            const alert = document.getElementById('formAlert');
+
+            if (!selectedCountry) {
+                showAlert(alert, 'Por favor selecciona un país', 'error');
+                return;
+            }
+
+            const ip = document.getElementById('ip').value;
+            if (!validarIP(ip)) {
+                showAlert(alert, 'Por favor ingresa una IP válida', 'error');
+                return;
+            }
+
+            const vps = {
+                id: Date.now(),
+                pais: selectedCountry,
+                ip: ip,
+                puerto: document.getElementById('puerto').value,
+                usuario: document.getElementById('usuario').value,
+                descripcion: document.getElementById('descripcion').value,
+                creado: Date.now(),
+                expira: Date.now() + (4 * 24 * 60 * 60 * 1000),
+                ping: Math.floor(Math.random() * 230) + 20
+            };
+
+            let vpsList = JSON.parse(localStorage.getItem('vpsList')) || [];
+            vpsList.push(vps);
+            localStorage.setItem('vpsList', JSON.stringify(vpsList));
+
+            showAlert(alert, '¡VPS publicado exitosamente!', 'success');
+            document.getElementById('vpsForm').reset();
+            selectedCountry = null;
+            document.getElementById('countrySelect').value = '';
+            cargarVPS();
+
+            setTimeout(() => alert.classList.remove('show'), 3000);
+        }
+
+        function validarIP(ip) {
+            const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+            if (!ipRegex.test(ip)) return false;
+            const partes = ip.split('.');
+            return partes.every(p => parseInt(p) <= 255);
+        }
+
+        function showAlert(element, message, type) {
+            element.textContent = message;
+            element.className = `alert ${type} show`;
+        }
+
+        async function cargarVPS() {
+            let vpsList = JSON.parse(localStorage.getItem('vpsList')) || [];
+            const ahora = Date.now();
+
+            vpsList = vpsList.filter(vps => vps.expira > ahora);
+            localStorage.setItem('vpsList', JSON.stringify(vpsList));
+
+            const grid = document.getElementById('vpsGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            if (vpsList.length === 0) {
+                grid.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            emptyState.style.display = 'none';
+
+            grid.innerHTML = vpsList.map(vps => {
+                const tiempoRestante = Math.ceil((vps.expira - ahora) / (1000 * 60 * 60));
+                const expiryClass = tiempoRestante < 24 ? 'warning' : '';
+                
+                return `
+                    <div class="vps-card">
+                        <div class="vps-header-card">
+                            <div class="vps-flag">${COUNTRIES[vps.pais].flag}</div>
+                            <div class="vps-info">
+                                <h3>${COUNTRIES[vps.pais].name}</h3>
+                                <p>${vps.pais}</p>
+                            </div>
+                        </div>
+
+                                <div class="vps-header-card">
+                                    <div class="vps-flag">${COUNTRIES[vps.pais].flag}</div>
+                                    <div class="vps-info">
+                                        <h3>${COUNTRIES[vps.pais].name}</h3>
+                                        <p>${vps.pais}</p>
+                                        <div style="margin-top:8px;">
+                                            <span class="vps-property-label" style="font-weight:700;margin-right:8px">EXPIRA</span>
+                                            <span style="color:var(--muted);font-weight:700">${tiempoRestante}h</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                        <div class="vps-property">
+                            <span class="vps-property-label">PING</span>
+                            ${getPingBadge(vps.ping)}
+                        </div>
+
+                        <div class="vps-property">
+                            <span class="vps-property-label">IP</span>
+                            <span class="vps-property-value">${vps.ip}</span>
+                        </div>
+
+                        ${vps.puerto ? `
+                        <div class="vps-property">
+                            <span class="vps-property-label">PUERTO</span>
+                            <span class="vps-property-value">${vps.puerto}</span>
+                        </div>
+                        ` : ''}
+
+                        ${vps.usuario ? `
+                        <div class="vps-property">
+                            <span class="vps-property-label">USUARIO</span>
+                            <span class="vps-property-value">${vps.usuario}</span>
+                        </div>
+                        ` : ''}
+
+                        ${vps.descripcion ? `
+                        <div class="vps-description">
+                            <strong>Descripción:</strong><br>
+                            ${vps.descripcion}
+                        </div>
+                        ` : ''}
+
+                        <div class="vps-actions">
+                            <button class="btn-copy" onclick="copiarAlPortapapeles('${vps.ip}', this)">
+                                <i class="bi bi-clipboard"></i> Copiar IP
+                            </button>
+                            <button class="btn-delete" onclick="eliminarVPS(${vps.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function copiarAlPortapapeles(texto, btn) {
+            navigator.clipboard.writeText(texto).then(() => {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check"></i> Copiado';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                }, 2000);
+            });
+        }
+
+        function eliminarVPS(id) {
+            const pwd = prompt('Ingrese la contraseña maestra para eliminar este VPS:');
+            if (pwd === null) return; // cancel
+
+            if (!verifyMasterPassword(pwd)) {
+                alert('Contraseña incorrecta. Eliminación cancelada.');
+                return;
+            }
+
+            if (!confirm('¿Estás seguro de que deseas eliminar este VPS?')) return;
+
+            let vpsList = JSON.parse(localStorage.getItem('vpsList')) || [];
+            vpsList = vpsList.filter(vps => vps.id !== id);
+            localStorage.setItem('vpsList', JSON.stringify(vpsList));
+            cargarVPS();
+        }
+
+        window.addEventListener('load', () => {
+            initCountrySelector();
+            cargarVPS();
+        });
+
+        setInterval(cargarVPS, 30000);
+
+        
+
+    </script>
+    <script>
+        // URL de descarga configurables: por defecto abre la ficha de Google Play
+        // o puedes sobrescribirla en runtime con `localStorage.setItem('downloadURL', '<tu_url>')`.
+        const DOWNLOAD_URL = localStorage.getItem('downloadURL') || 'https://play.google.com/store/apps/details?id=com.socketdevz.dev&pcampaignid=web_share';
+
+        function handleDownload(e) {
+            e.preventDefault();
+            const url = DOWNLOAD_URL;
+
+            try {
+                const resolved = new URL(url, window.location.href);
+
+                // Crear un <a> para forzar descarga cuando sea posible
+                const a = document.createElement('a');
+                a.href = resolved.href;
+                a.rel = 'noopener';
+                // Si es mismo origen, permitir atributo download
+                if (resolved.origin === window.location.origin) a.setAttribute('download', '');
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch (err) {
+                // Fallback simple
+                window.open(url, '_blank', 'noopener');
+            }
+        }
+    </script>
+</body>
+</html>
