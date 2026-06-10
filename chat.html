@@ -66,80 +66,82 @@
     </footer>
 
     <script src="script.js"></script>
+    <script src="shared-store.js"></script>
     <script>
-        // Chat script (same logic as vps.html chat)
-        const CHAT_KEY = 'communityChat';
-        const CHAT_CLEANUP_KEY = 'communityChatLastCleanup';
-        const BC_NAME = 'socketdevz_chat_channel';
-        let bc = null;
-
-        function nowColombia() {
-            const d = new Date();
-            const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-            return new Date(utc - (5 * 60 * 60000));
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
         }
 
-        function chatCleanupIfNeeded() {
-            const dt = nowColombia();
-            const dateStr = dt.toISOString().slice(0,10);
-            const last = localStorage.getItem(CHAT_CLEANUP_KEY);
-            if (last !== dateStr && dt.getHours() === 0) {
-                localStorage.removeItem(CHAT_KEY);
-                localStorage.setItem(CHAT_CLEANUP_KEY, dateStr);
-                broadcastChatUpdate();
+        async function renderChat() {
+            const container = document.getElementById('chatMessages');
+            const status = document.getElementById('chatStatus');
+
+            if (!container) return;
+
+            try {
+                const mode = await SharedCommunityStore.getMode();
+                const messages = await SharedCommunityStore.getChatMessages();
+
+                if (status) {
+                    status.textContent = mode === 'shared'
+                        ? 'Modo compartido activo. Todos los dispositivos ven los mismos mensajes.'
+                        : 'Modo local activo. Abre este proyecto con el servidor para compartir el chat.';
+                }
+
+                container.innerHTML = messages.map((message) => `
+                    <div class="chat-message">
+                        <div class="chat-meta"><strong>${escapeHtml(message.name)}</strong> · <span style="color:var(--muted)">${new Date(message.ts).toLocaleString()}</span></div>
+                        <div class="chat-text">${escapeHtml(message.text)}</div>
+                    </div>
+                `).join('');
+                container.scrollTop = container.scrollHeight;
+            } catch (error) {
+                if (status) {
+                    status.textContent = 'No se pudo conectar al servidor compartido. Está funcionando en local.';
+                }
             }
         }
 
-        function loadChatMessages() { try { return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); } catch(e) { return []; } }
-        function saveChatMessages(list) { localStorage.setItem(CHAT_KEY, JSON.stringify(list)); }
+        async function sendChatMessage() {
+            const nameEl = document.getElementById('chatName');
+            const inputEl = document.getElementById('chatInput');
+            const name = (nameEl.value || 'Anon').trim();
+            const text = (inputEl.value || '').trim();
 
-        function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+            if (!text) return;
 
-        function renderChat() {
-            const container = document.getElementById('chatMessages');
-            if (!container) return;
-            const msgs = loadChatMessages();
-            container.innerHTML = msgs.map(m => `
-                <div class="chat-message">
-                    <div class="chat-meta"><strong>${escapeHtml(m.name)}</strong> · <span style="color:var(--muted)">${new Date(m.ts).toLocaleString()}</span></div>
-                    <div class="chat-text">${escapeHtml(m.text)}</div>
-                </div>
-            `).join('');
-            container.scrollTop = container.scrollHeight;
+            await SharedCommunityStore.addChatMessage({ name, text });
+            inputEl.value = '';
+            await renderChat();
         }
 
-        function broadcastChatUpdate() { if (bc) bc.postMessage({type:'chat-update'}); localStorage.setItem('chat_ping', Date.now().toString()); }
-
         function initChatPage() {
-            try { bc = new BroadcastChannel(BC_NAME); bc.onmessage = ev => { if (ev.data && ev.data.type==='chat-update') renderChat(); }; } catch(e){ bc=null; }
-            window.addEventListener('storage', (e) => { if (e.key === CHAT_KEY || e.key === 'chat_ping') renderChat(); });
-
             const sendBtn = document.getElementById('sendChatBtn');
             const chatInput = document.getElementById('chatInput');
-            const chatName = document.getElementById('chatName');
             const emojis = document.querySelectorAll('#chatArea .emoji-btn');
 
             sendBtn.addEventListener('click', sendChatMessage);
-            chatInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') sendChatMessage(); });
-            emojis.forEach(btn => btn.addEventListener('click', ()=>{ chatInput.value += btn.textContent; chatInput.focus(); }));
+            chatInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    sendChatMessage();
+                }
+            });
 
-            renderChat(); chatCleanupIfNeeded(); setInterval(chatCleanupIfNeeded, 60*1000);
+            emojis.forEach((button) => {
+                button.addEventListener('click', () => {
+                    chatInput.value += button.textContent;
+                    chatInput.focus();
+                });
+            });
+
+            renderChat();
+            setInterval(renderChat, 10000);
         }
 
-        function sendChatMessage() {
-            const nameEl = document.getElementById('chatName');
-            const inputEl = document.getElementById('chatInput');
-            const name = (nameEl.value || 'Anon').trim().slice(0,30);
-            const text = (inputEl.value || '').trim().slice(0,500);
-            if (!text) return;
-            const msgs = loadChatMessages();
-            msgs.push({id: Date.now()+Math.random(), name: name, text: text, ts: Date.now()});
-            saveChatMessages(msgs);
-            inputEl.value = '';
-            renderChat(); broadcastChatUpdate();
-        }
-
-        window.addEventListener('load', () => { initChatPage(); });
+        window.addEventListener('load', initChatPage);
     </script>
 </body>
 </html>

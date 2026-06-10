@@ -143,6 +143,11 @@
                 <p>Comparte y accede a servidores VPS de la comunidad</p>
             </div>
 
+            <div class="info-box" id="vpsStatus" style="max-width:900px;margin:0 auto 18px;">
+                <i class="bi bi-cloud-check"></i>
+                Cargando estado del almacenamiento compartido...
+            </div>
+
             <div class="add-vps-form">
                 <h3>
                     <i class="bi bi-plus-circle"></i>
@@ -207,6 +212,7 @@
     </footer>
 
     <script src="script.js"></script>
+    <script src="shared-store.js"></script>
     <script>
         const COUNTRIES = {
             'US': { flag: '🇺🇸', name: 'Estados Unidos' },
@@ -293,7 +299,7 @@
             return `<span class="${className}"><span>${icon}</span> ${ping}ms</span>`;
         }
 
-        function handleAddVPS(event) {
+        async function handleAddVPS(event) {
             event.preventDefault();
             const alert = document.getElementById('formAlert');
 
@@ -308,27 +314,19 @@
                 return;
             }
 
-            const vps = {
-                id: Date.now(),
+            await SharedCommunityStore.addVpsEntry({
                 pais: selectedCountry,
                 ip: ip,
                 puerto: document.getElementById('puerto').value,
                 usuario: document.getElementById('usuario').value,
-                descripcion: document.getElementById('descripcion').value,
-                creado: Date.now(),
-                expira: Date.now() + (4 * 24 * 60 * 60 * 1000),
-                ping: Math.floor(Math.random() * 230) + 20
-            };
-
-            let vpsList = JSON.parse(localStorage.getItem('vpsList')) || [];
-            vpsList.push(vps);
-            localStorage.setItem('vpsList', JSON.stringify(vpsList));
+                descripcion: document.getElementById('descripcion').value
+            });
 
             showAlert(alert, '¡VPS publicado exitosamente!', 'success');
             document.getElementById('vpsForm').reset();
             selectedCountry = null;
             document.getElementById('countrySelect').value = '';
-            cargarVPS();
+            await cargarVPS();
 
             setTimeout(() => alert.classList.remove('show'), 3000);
         }
@@ -346,11 +344,16 @@
         }
 
         async function cargarVPS() {
-            let vpsList = JSON.parse(localStorage.getItem('vpsList')) || [];
+            const vpsList = await SharedCommunityStore.getVpsEntries();
             const ahora = Date.now();
+            const mode = await SharedCommunityStore.getMode();
+            const vpsStatus = document.getElementById('vpsStatus');
 
-            vpsList = vpsList.filter(vps => vps.expira > ahora);
-            localStorage.setItem('vpsList', JSON.stringify(vpsList));
+            if (vpsStatus) {
+                vpsStatus.innerHTML = mode === 'shared'
+                    ? '<i class="bi bi-cloud-check"></i> Modo compartido activo. Todos los dispositivos ven el mismo listado VPS.'
+                    : '<i class="bi bi-cloud-slash"></i> Modo local activo. El listado solo vive en este navegador.';
+            }
 
             const grid = document.getElementById('vpsGrid');
             const emptyState = document.getElementById('emptyState');
@@ -367,28 +370,21 @@
             grid.innerHTML = vpsList.map(vps => {
                 const tiempoRestante = Math.ceil((vps.expira - ahora) / (1000 * 60 * 60));
                 const expiryClass = tiempoRestante < 24 ? 'warning' : '';
+                const country = COUNTRIES[vps.pais] || { flag: '🌐', name: vps.pais || 'País desconocido' };
                 
                 return `
                     <div class="vps-card">
+                        <div class="vps-expiry ${expiryClass}">
+                            <i class="bi bi-clock"></i> ${tiempoRestante}h
+                        </div>
+
                         <div class="vps-header-card">
-                            <div class="vps-flag">${COUNTRIES[vps.pais].flag}</div>
+                            <div class="vps-flag">${country.flag}</div>
                             <div class="vps-info">
-                                <h3>${COUNTRIES[vps.pais].name}</h3>
+                                <h3>${country.name}</h3>
                                 <p>${vps.pais}</p>
                             </div>
                         </div>
-
-                                <div class="vps-header-card">
-                                    <div class="vps-flag">${COUNTRIES[vps.pais].flag}</div>
-                                    <div class="vps-info">
-                                        <h3>${COUNTRIES[vps.pais].name}</h3>
-                                        <p>${vps.pais}</p>
-                                        <div style="margin-top:8px;">
-                                            <span class="vps-property-label" style="font-weight:700;margin-right:8px">EXPIRA</span>
-                                            <span style="color:var(--muted);font-weight:700">${tiempoRestante}h</span>
-                                        </div>
-                                    </div>
-                                </div>
 
                         <div class="vps-property">
                             <span class="vps-property-label">PING</span>
@@ -444,9 +440,26 @@
             });
         }
 
-        function eliminarVPS(id) {
+        async function eliminarVPS(id) {
+            const mode = await SharedCommunityStore.getMode();
+
+            if (mode === 'shared') {
+                const token = prompt('Ingrese el token de administrador del servidor para eliminar este VPS:');
+                if (token === null) return;
+
+                if (!confirm('¿Estás seguro de que deseas eliminar este VPS?')) return;
+
+                try {
+                    await SharedCommunityStore.deleteVpsEntry(id, token.trim());
+                    await cargarVPS();
+                } catch (error) {
+                    alert(error.message || 'No se pudo eliminar el VPS.');
+                }
+                return;
+            }
+
             const pwd = prompt('Ingrese la contraseña maestra para eliminar este VPS:');
-            if (pwd === null) return; // cancel
+            if (pwd === null) return;
 
             if (!verifyMasterPassword(pwd)) {
                 alert('Contraseña incorrecta. Eliminación cancelada.');
@@ -458,7 +471,7 @@
             let vpsList = JSON.parse(localStorage.getItem('vpsList')) || [];
             vpsList = vpsList.filter(vps => vps.id !== id);
             localStorage.setItem('vpsList', JSON.stringify(vpsList));
-            cargarVPS();
+            await cargarVPS();
         }
 
         window.addEventListener('load', () => {
@@ -466,14 +479,13 @@
             cargarVPS();
         });
 
-        setInterval(cargarVPS, 30000);
+        setInterval(cargarVPS, 10000);
 
         
 
     </script>
     <script>
-        // URL de descarga configurables: por defecto abre la ficha de Google Play
-        // o puedes sobrescribirla en runtime con `localStorage.setItem('downloadURL', '<tu_url>')`.
+        
         const DOWNLOAD_URL = localStorage.getItem('downloadURL') || 'https://play.google.com/store/apps/details?id=com.socketdevz.dev&pcampaignid=web_share';
 
         function handleDownload(e) {
